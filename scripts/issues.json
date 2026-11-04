@@ -1,0 +1,15 @@
+[
+  {"m": "M1", "title": "M1: Account service REST API (accounts, balances, transactions)", "body": "Spring Boot 3 endpoints for accounts and transactions with Bean Validation and a global exception handler.\n\n- [ ] GET /api/accounts, GET /api/accounts/{id}/transactions (paged)\n- [ ] OpenAPI/Swagger docs\n- [ ] Unit tests with JUnit 5 + Mockito"},
+  {"m": "M1", "title": "M1: PostgreSQL + Flyway schema", "body": "- [ ] Docker Compose Postgres\n- [ ] Flyway migrations for customer, account, transaction\n- [ ] Spring Data JPA repositories + Testcontainers test"},
+  {"m": "M1", "title": "M1: JWT authentication with Spring Security", "body": "- [ ] Sign up / login / refresh token\n- [ ] BCrypt password hashing\n- [ ] Lock account after 5 failed attempts\n- [ ] RBAC: CUSTOMER and ADMIN roles"},
+  {"m": "M2", "title": "M2: Angular portal shell, login and route guards", "body": "- [ ] Angular 17+ app in /portal\n- [ ] HTTP interceptor for JWT\n- [ ] Route guards, reactive forms\n- [ ] Add portal job to CI"},
+  {"m": "M2", "title": "M2: Dashboard, transactions page and CSV export", "body": "- [ ] Account list with balances\n- [ ] Transactions: paging, filters, search\n- [ ] CSV export\n- [ ] Lighthouse accessibility 90+"},
+  {"m": "M2", "title": "M2: Transfers with idempotency keys", "body": "- [ ] Transfer between own accounts with confirm step\n- [ ] Idempotency-Key header so double clicks never double-send\n- [ ] Audit log entry for every transfer"},
+  {"m": "M3", "title": "M3: Kafka in Docker Compose + transaction simulator", "body": "- [ ] Kafka + Schema Registry in Compose\n- [ ] Avro schema for CardTransaction\n- [ ] Simulator publishing N events/sec"},
+  {"m": "M3", "title": "M3: Fraud service (rule-based scoring)", "body": "- [ ] Rules: amount spike, two countries within 1 hour\n- [ ] Publish to fraud-alerts topic\n- [ ] Dead-letter topic + retries"},
+  {"m": "M3", "title": "M3: Ledger service with exactly-once updates", "body": "- [ ] Outbox pattern or Kafka transactions\n- [ ] Prove no double counting when a pod is killed"},
+  {"m": "M4", "title": "M4: Notification service + React live alerts UI", "body": "- [ ] Server-Sent Events endpoint\n- [ ] React 18 + TypeScript alerts dashboard in /alerts-ui\n- [ ] React Testing Library tests"},
+  {"m": "M5", "title": "M5: Quality gates (Testcontainers, PACT, Cypress, SonarQube)", "body": "- [ ] Contract tests between services\n- [ ] One Cypress flow: login -> transfer\n- [ ] SonarQube / SonarCloud quality gate in CI\n- [ ] Trivy image scan"},
+  {"m": "M6", "title": "M6: Docker, Kubernetes and Terraform on AWS", "body": "- [ ] Dockerfile per service\n- [ ] Helm chart or k8s manifests\n- [ ] Terraform: VPC, EKS, MSK, RDS\n- [ ] terraform apply / destroy from scratch"},
+  {"m": "M7", "title": "M7: Observability and load test", "body": "- [ ] Micrometer -> Prometheus -> Grafana dashboards\n- [ ] OpenTelemetry traces across services\n- [ ] k6 load test: 1,000 events/sec, p95 alert latency < 2s"}
+]

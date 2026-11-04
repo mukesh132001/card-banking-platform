@@ -1,0 +1,22 @@
+# GitLab CI mirror of the GitHub Actions pipeline.
+stages:
+  - build
+  - test
+
+variables:
+  MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
+
+cache:
+  paths:
+    - .m2/repository
+
+account-service:
+  stage: test
+  image: maven:3.9-eclipse-temurin-21
+  script:
+    - cd services/account-service
+    - mvn -B verify
+  artifacts:
+    when: always
+    reports:
+      junit: services/account-service/target/surefire-reports/TEST-*.xml
