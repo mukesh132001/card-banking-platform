@@ -63,11 +63,42 @@ docs/                    Architecture notes and decisions
 
 ## Run locally
 
+Needs Java 21 only: the Maven Wrapper (`mvnw`) downloads the right Maven on first run. No database install needed: by default the service uses an in-memory H2 database in PostgreSQL mode, built by the same Flyway migrations, with demo data.
+
 ```bash
 cd services/account-service
-mvn spring-boot:run
-# http://localhost:8080/api/health
+./mvnw verify            # unit + integration tests (the PostgreSQL test runs too if Docker is up)
+./mvnw spring-boot:run   # http://localhost:8080/swagger-ui.html
+# Windows PowerShell: .\mvnw.cmd verify  /  .\mvnw.cmd spring-boot:run
 ```
+
+Real PostgreSQL instead (needs Docker):
+
+```bash
+docker compose up -d                                   # from the repo root
+cd services/account-service
+./mvnw spring-boot:run -Dspring-boot.run.profiles=postgres
+```
+
+Try it (demo customer 1 is Alex Morgan, 2 is Priya Shah):
+
+```bash
+curl -H "X-Customer-Id: 1" http://localhost:8080/api/accounts
+curl -H "X-Customer-Id: 1" "http://localhost:8080/api/accounts/1/transactions?size=5&q=tesco"
+```
+
+### Account service API (M1)
+
+| Method | Path | What it returns |
+| --- | --- | --- |
+| GET | `/api/accounts` | The customer's accounts: masked number, type, balance, status |
+| GET | `/api/accounts/{id}` | One account; **404** if it doesn't exist *or* belongs to someone else, so ids can't be probed |
+| GET | `/api/accounts/{id}/transactions` | Paged, newest first. Filters: `from`, `to` (YYYY-MM-DD), `direction` (CREDIT/DEBIT), `q` (description or merchant); `page`, `size` (1-100) |
+
+- **Errors** are RFC 7807 problem details (`title`, `status`, `detail`); bad input is a 400 with the reason, unexpected errors are a 500 that never leaks internals.
+- **Schema** is owned by Flyway (`src/main/resources/db/migration`); money is `numeric(19,2)` / `BigDecimal`, never floating point; accounts carry a `version` column for optimistic locking.
+- **Tests:** controller tests with a Mockito-mocked service, service rules with plain Mockito, repository tests on H2, the same repository checks on real PostgreSQL 16 via **Testcontainers**, and end-to-end HTTP tests on the demo data.
+- **Who is the customer?** For now the `X-Customer-Id` header. JWT login (M1, issue 3) replaces it with the signed-in user.
 
 ## Related
 

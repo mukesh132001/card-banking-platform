@@ -4,9 +4,35 @@ server:
 spring:
   application:
     name: account-service
+  # Default: in-memory H2 in PostgreSQL mode, so the service runs with no Docker.
+  # Use the "postgres" profile for a real PostgreSQL (docker compose up -d at the repo root).
+  datasource:
+    url: jdbc:h2:mem:accounts;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none   # Flyway owns the schema
+  flyway:
+    locations: classpath:db/migration,classpath:db/demo   # db/demo = demo customers and transactions
 
 management:
   endpoints:
     web:
       exposure:
         include: health,info,prometheus
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+---
+spring:
+  config:
+    activate:
+      on-profile: postgres
+  datasource:
+    url: jdbc:postgresql://localhost:5432/bank
+    username: bank
+    password: bank
