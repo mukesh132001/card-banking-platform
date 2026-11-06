@@ -53,7 +53,7 @@ docs/                    Architecture notes and decisions
 
 ## Roadmap
 
-- [ ] **M1 — Foundations:** account-service with REST API, PostgreSQL, Flyway, JWT auth, unit tests
+- [x] **M1 — Foundations:** account-service with REST API, PostgreSQL, Flyway, JWT auth, unit tests
 - [ ] **M2 — Portal:** Angular login, dashboard, transactions page, transfers with idempotency keys
 - [ ] **M3 — Events:** Kafka in Docker Compose, transaction simulator, fraud and ledger services
 - [ ] **M4 — Live alerts:** notification service + React alerts UI over SSE
@@ -80,25 +80,60 @@ cd services/account-service
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=postgres
 ```
 
-Try it (demo customer 1 is Alex Morgan, 2 is Priya Shah):
+Try it. Demo logins are created at startup (`app.demo-users=true`, local only):
+
+| Email | Password | Role |
+| --- | --- | --- |
+| alex.morgan@example.com | alex-demo-password | CUSTOMER (2 accounts) |
+| priya.shah@example.com | priya-demo-password | CUSTOMER (1 account) |
+| admin@example.com | admin-demo-password | ADMIN |
+
+```powershell
+# Windows PowerShell, with the service running in another terminal
+$login = Invoke-RestMethod -Method Post http://localhost:8080/api/auth/login -ContentType "application/json" `
+  -Body '{"email":"alex.morgan@example.com","password":"alex-demo-password"}'
+$auth = @{ Authorization = "Bearer $($login.accessToken)" }
+Invoke-RestMethod http://localhost:8080/api/accounts -Headers $auth
+Invoke-RestMethod "http://localhost:8080/api/accounts/1/transactions?size=5&q=tesco" -Headers $auth
+```
 
 ```bash
-curl -H "X-Customer-Id: 1" http://localhost:8080/api/accounts
-curl -H "X-Customer-Id: 1" "http://localhost:8080/api/accounts/1/transactions?size=5&q=tesco"
+# macOS / Linux
+TOKEN=$(curl -s -X POST localhost:8080/api/auth/login -H 'Content-Type: application/json' \
+  -d '{"email":"alex.morgan@example.com","password":"alex-demo-password"}' | jq -r .accessToken)
+curl -H "Authorization: Bearer $TOKEN" localhost:8080/api/accounts
 ```
+
+In Swagger UI: call `POST /api/auth/login`, copy `accessToken`, click **Authorize** and paste it.
 
 ### Account service API (M1)
 
-| Method | Path | What it returns |
-| --- | --- | --- |
-| GET | `/api/accounts` | The customer's accounts: masked number, type, balance, status |
-| GET | `/api/accounts/{id}` | One account; **404** if it doesn't exist *or* belongs to someone else, so ids can't be probed |
-| GET | `/api/accounts/{id}/transactions` | Paged, newest first. Filters: `from`, `to` (YYYY-MM-DD), `direction` (CREDIT/DEBIT), `q` (description or merchant); `page`, `size` (1-100) |
+| Method | Path | Who | What it does |
+| --- | --- | --- | --- |
+| POST | `/api/auth/signup` | anyone | Create a customer login; returns tokens (201). Password 12-64 characters |
+| POST | `/api/auth/login` | anyone | Email + password → access token (JWT, 15 min) + refresh token (7 days). 401 if wrong, **423 after 5 failures in a row** (locked 15 min) |
+| POST | `/api/auth/refresh` | anyone with a refresh token | New token pair. Each refresh token works **once** |
+| POST | `/api/auth/logout` | anyone | Revokes a refresh token (204) |
+| GET | `/api/auth/me` | signed in | Who the token belongs to |
+| GET | `/api/accounts` | CUSTOMER | The customer's accounts: masked number, type, balance, status |
+| GET | `/api/accounts/{id}` | CUSTOMER | One account; **404** if it doesn't exist *or* isn't theirs, so ids can't be probed |
+| GET | `/api/accounts/{id}/transactions` | CUSTOMER | Paged, newest first. Filters: `from`, `to` (YYYY-MM-DD), `direction` (CREDIT/DEBIT), `q`; `page`, `size` (1-100) |
+| GET | `/api/admin/customers`, `/api/admin/users` | ADMIN | Back office: customers with account counts; logins with failed attempts and lock status |
+| POST | `/api/admin/users/{id}/unlock` | ADMIN | Unlock a login |
 
-- **Errors** are RFC 7807 problem details (`title`, `status`, `detail`); bad input is a 400 with the reason, unexpected errors are a 500 that never leaks internals.
+**Security design**
+
+- **Passwords** are hashed with BCrypt (cost 12). An unknown email costs the same time as a wrong password and gets the same message, so emails can't be discovered.
+- **Access tokens** are HS256 JWTs (`sub`, `email`, `roles`, `cid` = customer id, `iss`, `exp`), checked for signature, expiry and issuer. The customer is taken from the token, never from the request. Set `JWT_SECRET` (32+ bytes) anywhere shared.
+- **Refresh tokens** are random 256-bit values; only their SHA-256 hash is stored. They rotate on every use, and replaying an old one (a sign it was stolen) revokes all of that user's tokens.
+- **Lockout:** 5 wrong passwords lock the login for 15 minutes; an admin can unlock it. The failed-attempt counter is saved even though the request fails (`@Transactional(noRollbackFor = …)`).
+- **Roles:** `/api/accounts/**` needs CUSTOMER, `/api/admin/**` needs ADMIN. Stateless sessions; CSRF is off because tokens travel in the `Authorization` header, not cookies.
+- **Errors** are RFC 7807 problem details; unexpected errors are a 500 that never leaks internals.
+
+**Data and tests**
+
 - **Schema** is owned by Flyway (`src/main/resources/db/migration`); money is `numeric(19,2)` / `BigDecimal`, never floating point; accounts carry a `version` column for optimistic locking.
-- **Tests:** controller tests with a Mockito-mocked service, service rules with plain Mockito, repository tests on H2, the same repository checks on real PostgreSQL 16 via **Testcontainers**, and end-to-end HTTP tests on the demo data.
-- **Who is the customer?** For now the `X-Customer-Id` header. JWT login (M1, issue 3) replaces it with the signed-in user.
+- **Tests:** controller tests with signed test JWTs and a Mockito service; auth rules (lockout, rotation, reuse detection, hashing) with Mockito and a movable clock; end-to-end HTTP tests for every auth flow, including expired, wrong-issuer and tampered tokens; repository tests on H2 and on real PostgreSQL 16 via **Testcontainers**.
 
 ## Related
 

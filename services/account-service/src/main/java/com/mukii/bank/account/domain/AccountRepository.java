@@ -11,4 +11,6 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
 
     /** Ownership check built into the query: another customer's account is simply "not found". */
     Optional<Account> findByIdAndCustomerId(Long id, Long customerId);
+
+    long countByCustomerId(Long customerId);
 }

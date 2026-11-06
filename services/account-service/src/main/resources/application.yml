@@ -17,6 +17,21 @@ spring:
   flyway:
     locations: classpath:db/migration,classpath:db/demo   # db/demo = demo customers and transactions
 
+security:
+  jwt:
+    # HS256 key: at least 32 bytes. The default is for local development only; set JWT_SECRET anywhere shared.
+    secret: ${JWT_SECRET:local-dev-only-secret-change-me-0123456789abcdef}
+    issuer: card-banking-platform/account-service
+    access-token-ttl: 15m
+    refresh-token-ttl: 7d
+  login:
+    max-failed-attempts: 5
+    lock-duration: 15m
+
+app:
+  # Creates demo logins (see README) at startup if they don't exist. Turn off in any real environment.
+  demo-users: true
+
 management:
   endpoints:
     web:
