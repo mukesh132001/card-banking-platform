@@ -9,8 +9,8 @@ import { DashboardComponent } from './dashboard.component';
 
 describe('DashboardComponent', () => {
   const accounts: AccountSummary[] = [
-    { id: 1, maskedNumber: '•••• 1234', type: 'CHECKING', currency: 'GBP', balance: 5309.01, status: 'ACTIVE', openedAt: '2026-08-01T09:00:00Z' },
-    { id: 2, maskedNumber: '•••• 9876', type: 'SAVINGS', currency: 'GBP', balance: 13084, status: 'ACTIVE', openedAt: '2026-08-01T09:00:00Z' },
+    { id: 1, maskedNumber: '•••• 1234', type: 'CHECKING', currency: 'GBP', balance: '5309.01', status: 'ACTIVE', openedAt: '2026-08-01T09:00:00Z' },
+    { id: 2, maskedNumber: '•••• 9876', type: 'SAVINGS', currency: 'GBP', balance: '13084.00', status: 'ACTIVE', openedAt: '2026-08-01T09:00:00Z' },
   ];
 
   function render(list: AccountsService['list']): HTMLElement {
@@ -32,6 +32,17 @@ describe('DashboardComponent', () => {
     expect(cards[0].textContent).toContain('£5,309.01');
     expect(el.querySelector('.total')?.textContent).toContain('£18,393.01');
     expect(cards[1].querySelector('a')?.getAttribute('href')).toBe('/accounts/2');
+  });
+
+  it('adds balances exactly, with no floating-point drift', () => {
+    const el = render(() =>
+      of([
+        { ...accounts[0], balance: '0.10' },
+        { ...accounts[1], balance: '0.20' },
+      ]),
+    );
+    // 0.1 + 0.2 in floating point is 0.30000000000000004
+    expect(el.querySelector('.total')?.textContent).toContain('£0.30');
   });
 
   it('explains when an admin login has no customer accounts', () => {

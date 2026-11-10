@@ -94,6 +94,27 @@ describe('AuthService', () => {
     req.flush(null, { status: 204, statusText: 'No Content' });
   });
 
+  it('knows the roles and where each kind of user lands', () => {
+    logIn();
+    expect(auth.hasRole('CUSTOMER')).toBeTrue();
+    expect(auth.hasRole('ADMIN')).toBeFalse();
+    expect(auth.homeUrl()).toBe('/accounts');
+
+    auth.login('admin@example.com', 'pw').subscribe();
+    http
+      .expectOne('/api/auth/login')
+      .flush(tokens(fakeJwt({ sub: '9', email: 'admin@example.com', roles: ['ADMIN'], exp: Math.floor(Date.now() / 1000) + 900 })));
+    expect(auth.hasRole('ADMIN')).toBeTrue();
+    expect(auth.homeUrl()).toBe('/admin');
+  });
+
+  it('needs a refresh only when the access token has expired and a refresh token is stored', () => {
+    expect(auth.needsRefresh()).toBeFalse();
+    logIn();
+    expect(auth.needsRefresh()).toBeFalse();
+    expect(auth.needsRefresh(Date.now() + 15 * 60_000)).toBeTrue();
+  });
+
   it('reads claims from a token and spots expiry', () => {
     const user = decodeUser(fakeJwt({ sub: '7', email: 'a@b.c', roles: ['ADMIN'], exp: 1 }));
     expect(user).toEqual({ userId: '7', email: 'a@b.c', roles: ['ADMIN'], customerId: null, expiresAt: 1000 });

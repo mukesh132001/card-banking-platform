@@ -52,10 +52,10 @@ docs/                    Architecture notes and decisions
 ## Roadmap
 
 - [x] **M1 — Foundations:** account-service with REST API, PostgreSQL, Flyway, JWT auth, unit tests
-- [ ] **M2 — Portal:** Angular login, dashboard, transactions page, transfers with idempotency keys
+- [ ] **M2 — Portal:** *(login with token refresh and lockout messages, role guards, accounts dashboard, transactions with server paging, debounced search and CSV export, back office, unit + Cypress tests in CI done; transfers next)* Angular login, dashboard, transactions page, transfers with idempotency keys
 - [ ] **M3 — Events:** Kafka in Docker Compose, transaction simulator, fraud and ledger services
 - [ ] **M4 — Live alerts:** notification service + React alerts UI over SSE
-- [ ] **M5 — Quality:** Testcontainers, PACT contract tests, Cypress end-to-end, SonarQube gate
+- [ ] **M5 — Quality:** Testcontainers, PACT contract tests, Cypress end-to-end *(portal journey done)*, SonarQube gate
 - [ ] **M6 — Cloud:** Docker images, Kubernetes, Terraform on AWS EKS + MSK
 - [ ] **M7 — Observability & scale:** Prometheus/Grafana, OpenTelemetry, k6 load test at 1,000 events/sec
 
@@ -140,8 +140,19 @@ In Swagger UI: call `POST /api/auth/login`, copy `accessToken`, click **Authoriz
 
 **Data and tests**
 
-- **Schema** is owned by Flyway (`src/main/resources/db/migration`); money is `numeric(19,2)` / `BigDecimal`, never floating point; accounts carry a `version` column for optimistic locking.
+- **Schema** is owned by Flyway (`src/main/resources/db/migration`); money is `numeric(19,2)` / `BigDecimal`, never floating point, and the API sends it as an exact decimal string (`"5309.01"`) so no client parses it into a float; accounts carry a `version` column for optimistic locking.
 - **Tests:** controller tests with signed test JWTs and a Mockito service; auth rules (lockout, rotation, reuse detection, hashing) with Mockito and a movable clock; end-to-end HTTP tests for every auth flow, including expired, wrong-issuer and tampered tokens; repository tests on H2 and on real PostgreSQL 16 via **Testcontainers**.
+
+### Customer portal (M2)
+
+```powershell
+cd portal
+npm install
+npm start      # http://localhost:4200, with the account service running on :8080
+npm run e2e    # Cypress: login -> accounts -> transactions
+```
+
+Angular 19 app: login with role guards (customer vs admin), an HTTP interceptor that attaches the JWT (kept in memory, not `localStorage`) and refreshes it when it expires, an accounts dashboard with exact money (decimal strings, BigInt totals), a transactions page with server paging, filters and a debounced search, a back office for unlocking logins, friendly error messages, `OnPush` and lazy-loaded routes. Details in [portal/README.md](portal/README.md).
 
 ## Related
 

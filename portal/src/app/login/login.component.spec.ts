@@ -16,7 +16,8 @@ describe('LoginComponent', () => {
 
   beforeEach(() => {
     returnUrl = null;
-    auth = jasmine.createSpyObj<AuthService>('AuthService', ['login']);
+    auth = jasmine.createSpyObj<AuthService>('AuthService', ['login', 'homeUrl']);
+    auth.homeUrl.and.returnValue('/accounts');
     TestBed.configureTestingModule({
       imports: [LoginComponent],
       providers: [
@@ -86,6 +87,15 @@ describe('LoginComponent', () => {
     expect(router.navigateByUrl).toHaveBeenCalledWith('/accounts');
   });
 
+  it('sends an admin to the back office', () => {
+    auth.homeUrl.and.returnValue('/admin');
+    auth.login.and.returnValue(of({ ...user, roles: ['ADMIN'], customerId: null }));
+    const el = render();
+    fill(el, 'admin@example.com', 'admin-demo-password');
+    submit(el);
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/admin');
+  });
+
   it('shows a clear message for a wrong password and clears the field', () => {
     auth.login.and.returnValue(throwError(() => new HttpErrorResponse({ status: 401 })));
     const el = render();
@@ -95,9 +105,10 @@ describe('LoginComponent', () => {
     expect(el.querySelector<HTMLInputElement>('#password')!.value).toBe('');
   });
 
-  it('explains a locked account using the server message', () => {
+  it('explains the 5-try lockout using the server message', () => {
     const locked = new HttpErrorResponse({ status: 423, error: { detail: 'Too many failed login attempts. Try again after 10:15.' } });
     expect(loginErrorMessage(locked)).toBe('Too many failed login attempts. Try again after 10:15.');
+    expect(loginErrorMessage(new HttpErrorResponse({ status: 423 }))).toContain('locked');
     expect(loginErrorMessage(new HttpErrorResponse({ status: 0 }))).toContain("Can't reach the server");
   });
 });

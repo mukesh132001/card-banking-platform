@@ -57,6 +57,18 @@ describe('authInterceptor', () => {
     expect(body).toEqual([{ id: 1 }]);
   });
 
+  it('refreshes before sending when the token has already expired (no wasted 401)', () => {
+    spyOn(auth, 'needsRefresh').and.returnValue(true);
+    spyOn(auth, 'accessToken').and.returnValue('expired');
+    const refresh = spyOn(auth, 'refresh').and.returnValue(of('fresh'));
+    client.get('/api/accounts').subscribe();
+
+    const req = http.expectOne('/api/accounts');
+    expect(req.request.headers.get('Authorization')).toBe('Bearer fresh');
+    req.flush([]);
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
   it('logs out when the refresh fails too', () => {
     spyOn(auth, 'accessToken').and.returnValue('expired');
     spyOn(auth, 'hasRefreshToken').and.returnValue(true);
