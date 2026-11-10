@@ -1,0 +1,71 @@
+:root {
+  --ink: #14213d;
+  --muted: #5b6475;
+  --line: #d9dee7;
+  --bg: #f5f7fb;
+  --card: #ffffff;
+  --brand: #0b5cad;
+  --brand-ink: #ffffff;
+  --credit: #0a7a3d;
+  --danger: #b3261e;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; }
+main:focus { outline: none; }
+h1 { font-size: 1.6rem; margin: 0 0 16px; }
+
+.skip-link { position: absolute; left: -999px; top: 8px; background: var(--card); padding: 8px 12px; }
+.skip-link:focus { left: 8px; }
+
+.topbar {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 16px; background: var(--brand); color: var(--brand-ink);
+}
+.topbar a, .topbar .link-button { color: var(--brand-ink); }
+.brand { font-weight: 700; text-decoration: none; }
+.who { margin-right: 12px; }
+
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 20px; }
+.narrow { max-width: 420px; margin: 32px auto; }
+
+label { display: block; font-weight: 600; margin: 12px 0 4px; }
+input, select { width: 100%; padding: 9px 10px; border: 1px solid #8a93a3; border-radius: 6px; font: inherit; }
+input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible { outline: 3px solid #f2b705; outline-offset: 2px; }
+
+button { font: inherit; padding: 9px 14px; border-radius: 6px; border: 1px solid var(--brand); background: var(--card); color: var(--brand); cursor: pointer; }
+button:disabled { opacity: 0.55; cursor: not-allowed; }
+button.primary { background: var(--brand); color: var(--brand-ink); }
+.link-button { background: none; border: none; padding: 0; text-decoration: underline; }
+form button.primary { margin-top: 16px; }
+
+.field-error, .alert { color: var(--danger); }
+.alert { background: #fdecea; border: 1px solid #f4c7c3; padding: 10px 12px; border-radius: 6px; }
+.muted { color: var(--muted); }
+.hint { margin-top: 20px; color: var(--muted); }
+.total { font-size: 1.1rem; }
+
+.account-list { list-style: none; padding: 0; display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.account a { display: grid; gap: 4px; text-decoration: none; color: inherit; }
+.account .type { font-weight: 600; }
+.account .number { color: var(--muted); }
+.account .balance { font-size: 1.4rem; font-weight: 700; }
+.account .status { color: var(--danger); font-weight: 600; }
+
+.filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 16px; }
+.filters > div { min-width: 140px; }
+.filters .grow { flex: 1; }
+.filters .actions { display: flex; gap: 8px; }
+.filters .actions button { margin: 0; }
+
+.transactions { width: 100%; border-collapse: collapse; background: var(--card); }
+.transactions th, .transactions td { padding: 10px; border-bottom: 1px solid var(--line); text-align: left; }
+.transactions .num { text-align: right; white-space: nowrap; }
+.transactions .credit { color: var(--credit); font-weight: 600; }
+.pager { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
