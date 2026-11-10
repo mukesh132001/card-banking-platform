@@ -1,5 +1,9 @@
 /** Shapes returned by the account service (see services/account-service). */
 
+import { Money } from './money';
+
+export type { Money } from './money';
+
 export interface TokenResponse {
   accessToken: string;
   tokenType: string;
@@ -15,7 +19,8 @@ export interface AccountSummary {
   maskedNumber: string;
   type: AccountType;
   currency: string;
-  balance: number;
+  /** Exact decimal string, e.g. "5309.01". */
+  balance: Money;
   status: 'ACTIVE' | 'FROZEN' | 'CLOSED';
   openedAt: string;
 }
@@ -24,12 +29,13 @@ export interface TransactionView {
   id: number;
   postedAt: string;
   direction: Direction;
-  amount: number;
-  signedAmount: number;
+  amount: Money;
+  /** Negative for money out. */
+  signedAmount: Money;
   description: string;
   merchant: string | null;
   category: string | null;
-  balanceAfter: number;
+  balanceAfter: Money;
 }
 
 export interface Page<T> {
@@ -52,6 +58,26 @@ export interface TransactionFilters {
   to?: string;
   direction?: Direction | '';
   q?: string;
+}
+
+export type Role = 'CUSTOMER' | 'ADMIN';
+
+/** GET /api/admin/users */
+export interface AdminUser {
+  id: number;
+  email: string;
+  role: Role;
+  customerId: number | null;
+  failedAttempts: number;
+  locked: boolean;
+}
+
+/** GET /api/admin/customers */
+export interface AdminCustomer {
+  id: number;
+  email: string;
+  fullName: string;
+  accounts: number;
 }
 
 export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {

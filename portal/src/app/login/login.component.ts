@@ -1,15 +1,15 @@
-import { HttpErrorResponse } from '@angular/common/http';
-import { Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 
-import { ProblemDetail } from '../core/api.models';
 import { safeReturnUrl } from '../core/auth.guard';
 import { AuthService } from '../core/auth.service';
+import { friendlyError } from '../core/errors';
 
 @Component({
   selector: 'app-login',
   imports: [ReactiveFormsModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="card narrow">
       <h1>Log in</h1>
@@ -40,7 +40,7 @@ import { AuthService } from '../core/auth.service';
       </form>
       <details class="hint">
         <summary>Demo logins (local only)</summary>
-        <p>alex.morgan&#64;example.com / alex-demo-password<br />priya.shah&#64;example.com / priya-demo-password</p>
+        <p>alex.morgan&#64;example.com / alex-demo-password<br />priya.shah&#64;example.com / priya-demo-password<br />admin&#64;example.com / admin-demo-password (back office)</p>
       </details>
     </section>
   `,
@@ -72,7 +72,8 @@ export class LoginComponent {
     this.error.set(null);
     this.auth.login(email, password).subscribe({
       next: () => {
-        const target = safeReturnUrl(this.route.snapshot.queryParamMap.get('returnUrl'));
+        // Customers land on /accounts, admins on /admin, unless they were sent here from a (same-site) page.
+        const target = safeReturnUrl(this.route.snapshot.queryParamMap.get('returnUrl'), this.auth.homeUrl());
         this.router.navigateByUrl(target).catch(() => undefined);
       },
       error: (err: unknown) => {
@@ -84,19 +85,7 @@ export class LoginComponent {
   }
 }
 
+/** 401 -> "Invalid email or password.", 423 -> the server's lockout message (when it ends), 0 -> server down. */
 export function loginErrorMessage(err: unknown): string {
-  if (err instanceof HttpErrorResponse) {
-    const problem = err.error as ProblemDetail | null;
-    switch (err.status) {
-      case 0:
-        return "Can't reach the server. Is the account service running?";
-      case 401:
-        return 'Invalid email or password.';
-      case 423:
-        return problem?.detail ?? 'Too many failed attempts. Try again later.';
-      default:
-        break;
-    }
-  }
-  return 'Something went wrong. Please try again.';
+  return friendlyError(err, 'login');
 }

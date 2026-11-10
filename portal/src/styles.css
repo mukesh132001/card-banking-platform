@@ -69,3 +69,9 @@ form button.primary { margin-top: 16px; }
 .pager { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
 
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.topbar nav { display: flex; align-items: center; gap: 16px; }
+.topbar nav a { text-decoration: none; }
+.topbar nav a.active { text-decoration: underline; text-underline-offset: 4px; font-weight: 600; }
+h2 { font-size: 1.2rem; margin: 28px 0 8px; }
+.notice { color: var(--credit); background: #e8f5ee; border: 1px solid #b8dfc9; padding: 10px 12px; border-radius: 6px; }

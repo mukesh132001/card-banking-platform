@@ -1,4 +1,4 @@
-import { TransactionView } from './api.models';
+import { Money, TransactionView } from './api.models';
 
 export const CSV_HEADER = ['Date', 'Description', 'Merchant', 'Category', 'Direction', 'Amount', 'Balance after'];
 
@@ -18,21 +18,30 @@ export function csvCell(value: string | number | null | undefined): string {
   return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
+/**
+ * A money cell, written exactly as the API sent it ("-12.50"), so Excel reads a number. Only a strict decimal is let
+ * through unquoted; anything else is treated as text by csvCell (and so formula-neutralised).
+ */
+export function csvMoney(value: Money | null | undefined): string {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  return /^-?\d+(\.\d+)?$/.test(value) ? value : csvCell(value);
+}
+
 export function transactionsToCsv(rows: TransactionView[]): string {
   const lines = [CSV_HEADER.map(csvCell).join(',')];
   for (const t of rows) {
     lines.push(
       [
-        t.postedAt,
-        t.description,
-        t.merchant,
-        t.category,
-        t.direction,
-        Number(t.signedAmount.toFixed(2)),
-        Number(t.balanceAfter.toFixed(2)),
-      ]
-        .map(csvCell)
-        .join(','),
+        csvCell(t.postedAt),
+        csvCell(t.description),
+        csvCell(t.merchant),
+        csvCell(t.category),
+        csvCell(t.direction),
+        csvMoney(t.signedAmount),
+        csvMoney(t.balanceAfter),
+      ].join(','),
     );
   }
   return lines.join('\r\n') + '\r\n';

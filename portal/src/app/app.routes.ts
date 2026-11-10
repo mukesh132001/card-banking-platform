@@ -1,26 +1,40 @@
 import { Routes } from '@angular/router';
 
-import { authGuard } from './core/auth.guard';
-import { LoginComponent } from './login/login.component';
+import { guestGuard, roleGuard } from './core/auth.guard';
 
+/**
+ * Every page is lazy-loaded, so the first download is just the shell + router; each page's code arrives the first
+ * time it is opened. Customer pages need CUSTOMER, the back office needs ADMIN.
+ */
 export const routes: Routes = [
-  { path: 'login', component: LoginComponent, title: 'Log in · Card Banking' },
   {
-    path: '',
-    canActivate: [authGuard],
+    path: 'login',
+    title: 'Log in · Card Banking',
+    canActivate: [guestGuard],
+    loadComponent: () => import('./login/login.component').then((m) => m.LoginComponent),
+  },
+  { path: '', pathMatch: 'full', redirectTo: 'accounts' },
+  {
+    path: 'accounts',
+    canActivate: [roleGuard('CUSTOMER')],
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'accounts' },
       {
-        path: 'accounts',
+        path: '',
         title: 'Your accounts · Card Banking',
         loadComponent: () => import('./dashboard/dashboard.component').then((m) => m.DashboardComponent),
       },
       {
-        path: 'accounts/:id',
+        path: ':id',
         title: 'Transactions · Card Banking',
         loadComponent: () => import('./transactions/transactions.component').then((m) => m.TransactionsComponent),
       },
     ],
   },
-  { path: '**', redirectTo: '' },
+  {
+    path: 'admin',
+    title: 'Back office · Card Banking',
+    canActivate: [roleGuard('ADMIN')],
+    loadComponent: () => import('./admin/admin.component').then((m) => m.AdminComponent),
+  },
+  { path: '**', redirectTo: 'accounts' },
 ];

@@ -3,7 +3,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { Observable, catchError, finalize, map, of, shareReplay, tap, throwError } from 'rxjs';
 
-import { TokenResponse } from './api.models';
+import { Role, TokenResponse } from './api.models';
 
 /** Who is signed in, read from the access token's claims. */
 export interface SessionUser {
@@ -29,6 +29,8 @@ const EXPIRY_SKEW_MS = 10_000;
  * - The refresh token is kept in sessionStorage so a reload stays signed in; it is cleared when the tab closes.
  *   (An httpOnly cookie would hide it from scripts entirely; that needs a backend change, noted in the README.)
  * - refresh() is single-flight: if five requests hit a 401 at once, only one refresh call goes out.
+ * - The interceptor also refreshes *before* sending when the token has already expired, so an idle tab doesn't
+ *   pay for a guaranteed 401 round trip.
  */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -51,6 +53,21 @@ export class AuthService {
 
   hasRefreshToken(): boolean {
     return readRefreshToken() !== null;
+  }
+
+  /** True when there is an access token but it has expired (or is about to), and a refresh token to swap it. */
+  needsRefresh(now = Date.now()): boolean {
+    const user = this.user();
+    return user !== null && isExpired(user, now) && this.hasRefreshToken();
+  }
+
+  hasRole(role: Role): boolean {
+    return this.user()?.roles.includes(role) ?? false;
+  }
+
+  /** Where this user lands after login, or when they open a page their role can't see. */
+  homeUrl(): string {
+    return this.hasRole('ADMIN') && !this.hasRole('CUSTOMER') ? '/admin' : '/accounts';
   }
 
   login(email: string, password: string): Observable<SessionUser> {

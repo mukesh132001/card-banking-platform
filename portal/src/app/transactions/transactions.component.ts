@@ -1,29 +1,53 @@
-import { CurrencyPipe, DatePipe } from '@angular/common';
-import { HttpErrorResponse } from '@angular/common/http';
-import { Component, inject, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NonNullableFormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import {
+  Observable,
+  Subject,
+  catchError,
+  combineLatest,
+  debounceTime,
+  distinctUntilChanged,
+  map,
+  merge,
+  of,
+  startWith,
+  switchMap,
+  tap,
+} from 'rxjs';
 
-import { ACCOUNT_TYPE_LABELS, AccountSummary, Direction, Page, ProblemDetail, TransactionFilters, TransactionView } from '../core/api.models';
+import { ACCOUNT_TYPE_LABELS, AccountSummary, Direction, Page, TransactionFilters, TransactionView } from '../core/api.models';
 import { AccountsService } from '../core/accounts.service';
 import { downloadCsv, transactionsToCsv } from '../core/csv';
+import { friendlyError } from '../core/errors';
+import { MoneyPipe } from '../core/money.pipe';
 
-const PAGE_SIZE = 20;
+export const PAGE_SIZE = 20;
+/** Wait this long after the last keystroke before searching, so typing "tesco" sends 1 request, not 5. */
+export const SEARCH_DEBOUNCE_MS = 300;
+
+interface PageRequest {
+  accountId: number;
+  filters: Required<TransactionFilters>;
+  page: number;
+}
 
 @Component({
   selector: 'app-transactions',
-  imports: [ReactiveFormsModule, CurrencyPipe, DatePipe, RouterLink],
+  imports: [ReactiveFormsModule, MoneyPipe, DatePipe, RouterLink],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <p><a routerLink="/accounts">← All accounts</a></p>
     @if (account(); as a) {
       <h1>{{ typeLabel(a) }} {{ a.maskedNumber }}</h1>
-      <p class="total">Balance <strong>{{ a.balance | currency: a.currency }}</strong></p>
+      <p class="total">Balance <strong>{{ a.balance | money: a.currency }}</strong></p>
     } @else {
       <h1>Transactions</h1>
     }
 
-    <form class="filters" [formGroup]="filters" (ngSubmit)="apply()" aria-label="Filter transactions">
+    <form class="filters" [formGroup]="filters" (ngSubmit)="searchNow()" aria-label="Filter transactions">
       <div>
         <label for="from">From</label>
         <input id="from" type="date" formControlName="from" />
@@ -42,10 +66,11 @@ const PAGE_SIZE = 20;
       </div>
       <div class="grow">
         <label for="q">Search</label>
-        <input id="q" type="search" formControlName="q" placeholder="Merchant or description" maxlength="100" />
+        <input id="q" type="search" formControlName="q" placeholder="Merchant or description" maxlength="100"
+               aria-describedby="q-hint" />
+        <span id="q-hint" class="visually-hidden">Results update as you type.</span>
       </div>
       <div class="actions">
-        <button type="submit" class="primary">Apply</button>
         <button type="button" (click)="clear()">Clear</button>
         <button type="button" (click)="exportCsv()" [disabled]="exporting() || !page()?.totalElements">
           {{ exporting() ? 'Exporting…' : 'Export CSV' }}
@@ -57,13 +82,16 @@ const PAGE_SIZE = 20;
       @if (error(); as message) {
         <p class="alert" role="alert">{{ message }}</p>
       }
+      @if (loading() && page()) {
+        <p class="muted">Updating…</p>
+      }
     </div>
 
     @if (page(); as p) {
       @if (p.totalElements === 0) {
         <p class="muted">No transactions match these filters.</p>
       } @else {
-        <table class="transactions">
+        <table class="transactions" [attr.aria-busy]="loading()">
           <caption class="visually-hidden">Transactions, newest first</caption>
           <thead>
             <tr>
@@ -80,8 +108,8 @@ const PAGE_SIZE = 20;
                 <td>{{ t.postedAt | date: 'd MMM y, HH:mm' }}</td>
                 <td>{{ t.description }}</td>
                 <td>{{ t.category ?? '' }}</td>
-                <td class="num" [class.credit]="t.direction === 'CREDIT'">{{ t.signedAmount | currency: currency() }}</td>
-                <td class="num">{{ t.balanceAfter | currency: currency() }}</td>
+                <td class="num" [class.credit]="t.direction === 'CREDIT'">{{ t.signedAmount | money: currency() }}</td>
+                <td class="num">{{ t.balanceAfter | money: currency() }}</td>
               </tr>
             }
           </tbody>
@@ -114,19 +142,43 @@ export class TransactionsComponent {
   readonly exporting = signal(false);
   readonly error = signal<string | null>(null);
 
+  /** Pager clicks. */
+  private readonly pageClicks = new Subject<number>();
+  /** Enter in the search box: search now instead of waiting for the debounce. */
+  private readonly submits = new Subject<void>();
   private accountId = 0;
 
   constructor() {
-    this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((params) => {
-      this.accountId = Number(params.get('id'));
-      this.account.set(null);
-      this.page.set(null);
-      this.api.get(this.accountId).subscribe({
-        next: (a) => this.account.set(a),
-        error: (err: unknown) => this.error.set(errorMessage(err)),
+    const accountId$ = this.route.paramMap.pipe(
+      map((params) => Number(params.get('id'))),
+      distinctUntilChanged(),
+      tap((id) => this.openAccount(id)),
+    );
+
+    accountId$
+      .pipe(
+        // New account or new filters -> back to page 0; pager clicks move within the current filters.
+        switchMap((accountId) =>
+          this.filterChanges().pipe(
+            switchMap((filters) =>
+              this.pageClicks.pipe(
+                startWith(0),
+                map((page): PageRequest => ({ accountId, filters, page })),
+              ),
+            ),
+          ),
+        ),
+        // switchMap cancels the in-flight request when a newer one starts, so a slow response for "tes"
+        // can never overwrite the results for "tesco".
+        switchMap((req) => this.fetch(req)),
+        takeUntilDestroyed(),
+      )
+      .subscribe((page) => {
+        if (page) {
+          this.page.set(page);
+        }
+        this.loading.set(false);
       });
-      this.load(0);
-    });
   }
 
   currency(): string {
@@ -137,63 +189,87 @@ export class TransactionsComponent {
     return ACCOUNT_TYPE_LABELS[a.type] ?? a.type;
   }
 
-  apply(): void {
-    this.load(0);
+  searchNow(): void {
+    this.submits.next();
   }
 
   clear(): void {
     this.filters.reset();
-    this.load(0);
+    this.submits.next();
   }
 
   goTo(page: number): void {
-    this.load(page);
+    this.pageClicks.next(page);
   }
 
   exportCsv(): void {
     this.exporting.set(true);
-    this.api.allTransactions(this.accountId, this.currentFilters()).subscribe({
+    this.api.allTransactions(this.accountId, cleanFilters(this.filters.getRawValue())).subscribe({
       next: (rows) => {
         downloadCsv(`transactions-${this.account()?.maskedNumber.slice(-4) ?? this.accountId}.csv`, transactionsToCsv(rows));
         this.exporting.set(false);
       },
       error: (err: unknown) => {
-        this.error.set(errorMessage(err));
+        this.error.set(friendlyError(err, 'export'));
         this.exporting.set(false);
       },
     });
   }
 
-  private currentFilters(): TransactionFilters {
-    return this.filters.getRawValue();
+  /**
+   * The current filters, emitted whenever they change. Dates and money in/out apply at once; the search text
+   * waits until typing pauses (debounceTime), or until Enter is pressed. Identical filters are not re-sent.
+   */
+  private filterChanges(): Observable<Required<TransactionFilters>> {
+    const { from, to, direction, q } = this.filters.controls;
+    const text$ = merge(
+      q.valueChanges.pipe(debounceTime(SEARCH_DEBOUNCE_MS)),
+      this.submits.pipe(map(() => q.value)),
+    ).pipe(startWith(q.value));
+
+    return combineLatest([
+      from.valueChanges.pipe(startWith(from.value)),
+      to.valueChanges.pipe(startWith(to.value)),
+      direction.valueChanges.pipe(startWith(direction.value)),
+      text$,
+    ]).pipe(
+      map(([f, t, d, text]) => cleanFilters({ from: f, to: t, direction: d, q: text })),
+      distinctUntilChanged(sameFilters),
+    );
   }
 
-  private load(page: number): void {
+  private openAccount(id: number): void {
+    this.accountId = id;
+    this.account.set(null);
+    this.page.set(null);
+    this.error.set(null);
+    this.api.get(id).subscribe({
+      next: (a) => this.account.set(a),
+      error: (err: unknown) => this.error.set(friendlyError(err, 'transactions')),
+    });
+  }
+
+  private fetch(req: PageRequest): Observable<Page<TransactionView> | null> {
+    const { from, to } = req.filters;
+    if (from && to && from > to) {
+      this.error.set('The "From" date must be on or before the "To" date.');
+      return of(null);
+    }
     this.loading.set(true);
     this.error.set(null);
-    this.api.transactions(this.accountId, this.currentFilters(), page, PAGE_SIZE).subscribe({
-      next: (p) => {
-        this.page.set(p);
-        this.loading.set(false);
-      },
-      error: (err: unknown) => {
-        this.error.set(errorMessage(err));
-        this.loading.set(false);
-      },
-    });
+    return this.api.transactions(req.accountId, req.filters, req.page, PAGE_SIZE).pipe(
+      catchError((err: unknown) => {
+        this.error.set(friendlyError(err, 'transactions'));
+        return of(null);
+      }),
+    );
   }
 }
 
-/** The server's problem-detail message for 400/404, or a friendly fallback. */
-export function errorMessage(err: unknown): string {
-  if (err instanceof HttpErrorResponse) {
-    const detail = (err.error as ProblemDetail | null)?.detail;
-    if ((err.status === 400 || err.status === 404) && detail) {
-      return detail;
-    }
-    if (err.status === 0) {
-      return "Can't reach the server.";
-    }
-  }
-  return 'Something went wrong loading transactions. Please try again.';
+function cleanFilters(f: TransactionFilters): Required<TransactionFilters> {
+  return { from: f.from ?? '', to: f.to ?? '', direction: f.direction ?? '', q: (f.q ?? '').trim() };
+}
+
+function sameFilters(a: Required<TransactionFilters>, b: Required<TransactionFilters>): boolean {
+  return a.from === b.from && a.to === b.to && a.direction === b.direction && a.q === b.q;
 }
