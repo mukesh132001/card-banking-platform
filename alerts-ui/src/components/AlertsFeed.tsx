@@ -10,7 +10,8 @@ const FILTERS: Filter[] = ['all', 'high', 'medium', 'low'];
 export function AlertsFeed({ streamUrl }: { streamUrl: string }) {
   const { alerts, status, freshIds, paused, setPaused, clear } = useAlertStream(streamUrl);
   const [filter, setFilter] = useState<Filter>('all');
-  const now = useNow(15000); // keeps "2 minutes ago" labels current
+  useNow(5000); // re-render every 5 s so "2 minutes ago" labels stay current
+  const now = Date.now(); // read at render, so a just-arrived alert is never compared with a stale clock
 
   const counts = useMemo(() => {
     const c = { all: alerts.length, high: 0, medium: 0, low: 0 };

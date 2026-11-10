@@ -9,6 +9,8 @@ const notificationService = process.env.NOTIFICATION_SERVICE_URL ?? 'http://loca
 
 export default defineConfig({
   plugins: [react(), ...(useMock ? [mockAlertsPlugin()] : [])],
+  // Use Sass's modern compiler API; the legacy one prints a deprecation warning and goes away in Dart Sass 2.
+  css: { preprocessorOptions: { scss: { api: 'modern-compiler' } } },
   server: {
     port: 5173,
     proxy: {
