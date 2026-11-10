@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { isFraudAlert, type FraudAlert } from '../types/alert';
 import { addAlert } from './alertsReducer';
 
@@ -16,6 +16,7 @@ export interface AlertStream {
 }
 
 const FRESH_MS = 4000;
+const REPLAY_CUTOFF_MS = 10000;
 
 /**
  * Subscribes to notification-service's Server-Sent Events stream.
@@ -26,7 +27,9 @@ const FRESH_MS = 4000;
 export function useAlertStream(url: string): AlertStream {
   const [alerts, setAlerts] = useState<FraudAlert[]>([]);
   const [status, setStatus] = useState<StreamStatus>('connecting');
-  const [freshIds, setFreshIds] = useState<ReadonlySet<string>>(new Set());
+  // alertId -> when it arrived. Freshness is worked out from timestamps rather than one timer per alert,
+  // because browsers throttle timers in background tabs and a "New" badge could otherwise stick.
+  const [arrivals, setArrivals] = useState<Record<string, number>>({});
   const [lastEventAt, setLastEventAt] = useState<number | null>(null);
   const [paused, setPaused] = useState(false);
   const [reconnectKey, setReconnectKey] = useState(0); // bumped to reopen after the browser gives up
@@ -60,16 +63,10 @@ export function useAlertStream(url: string): AlertStream {
       if (seen.current.size > 500) seen.current.delete(seen.current.values().next().value!); // oldest first
       setAlerts((prev) => addAlert(prev, alert));
       setLastEventAt(Date.now());
-      setFreshIds((prev) => new Set(prev).add(alert.alertId));
-      timers.current.push(
-        window.setTimeout(() => {
-          setFreshIds((prev) => {
-            const next = new Set(prev);
-            next.delete(alert.alertId);
-            return next;
-          });
-        }, FRESH_MS),
-      );
+      // Only flag it "New" if it happened just now; a backlog replayed on connect isn't news.
+      if (Date.now() - Date.parse(alert.occurredAt) < REPLAY_CUTOFF_MS) {
+        setArrivals((prev) => ({ ...prev, [alert.alertId]: Date.now() }));
+      }
     };
 
     source.onopen = () => {
@@ -94,6 +91,25 @@ export function useAlertStream(url: string): AlertStream {
       timers.current = [];
     };
   }, [url, paused, reconnectKey]);
+
+  // While anything is fresh, tick once a second to expire it; stop ticking once nothing is.
+  const hasArrivals = Object.keys(arrivals).length > 0;
+  useEffect(() => {
+    if (!hasArrivals) return;
+    const id = window.setInterval(() => {
+      setArrivals((prev) => {
+        const cutoff = Date.now() - FRESH_MS;
+        const kept = Object.fromEntries(Object.entries(prev).filter(([, t]) => t > cutoff));
+        return Object.keys(kept).length === Object.keys(prev).length ? prev : kept;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [hasArrivals]);
+
+  const freshIds = useMemo(() => {
+    const cutoff = Date.now() - FRESH_MS;
+    return new Set(Object.entries(arrivals).filter(([, t]) => t > cutoff).map(([id]) => id));
+  }, [arrivals]);
 
   return {
     alerts,
