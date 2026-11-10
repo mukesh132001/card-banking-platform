@@ -4,8 +4,6 @@ A real-time card banking system: a secure customer portal on top of event-driven
 
 Built to mirror the stack used by large retail and investment banks: **Java / Spring Boot microservices, Angular + React front ends, Kafka, AWS, Kubernetes, Terraform and GitLab/GitHub CI**.
 
-> Status: 🚧 in progress. See the [roadmap](#roadmap) and the GitHub Issues board.
-
 ## Architecture
 
 ```mermaid
