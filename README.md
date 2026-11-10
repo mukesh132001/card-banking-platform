@@ -61,6 +61,16 @@ docs/                    Architecture notes and decisions
 - [ ] **M6 — Cloud:** Docker images, Kubernetes, Terraform on AWS EKS + MSK
 - [ ] **M7 — Observability & scale:** Prometheus/Grafana, OpenTelemetry, k6 load test at 1,000 events/sec
 
+## Alerts UI (React)
+
+![Live fraud alerts feed](docs/images/alerts-ui-live-feed.png)
+
+React 18 + TypeScript (Vite) feed of fraud alerts pushed over Server-Sent Events, with risk filters, pause/resume, auto-reconnect and de-duplication. Until `notification-service` lands (M4), `npm run dev` serves a mock stream that follows the same contract. Details: [alerts-ui/README.md](alerts-ui/README.md).
+
+```bash
+cd alerts-ui && npm install && npm run dev   # http://localhost:5173
+```
+
 ## Run locally
 
 Needs Java 21 only: the Maven Wrapper (`mvnw`) downloads the right Maven on first run. No database install needed: by default the service uses an in-memory H2 database in PostgreSQL mode, built by the same Flyway migrations, with demo data.

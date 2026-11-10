@@ -1,0 +1,40 @@
+// Design tokens as CSS custom properties, so light/dark is one switch.
+:root {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --surface-2: #eef0f3;
+  --border: #dde1e7;
+  --text: #16191f;
+  --text-muted: #5b6472;
+  --accent: #1f5fd6;
+  --high: #c62828;
+  --high-bg: #fdecec;
+  --medium: #b45309;
+  --medium-bg: #fff4e0;
+  --low: #2e7d32;
+  --low-bg: #e9f5ea;
+  --fresh: #e8f0ff;
+  --radius: 12px;
+  --shadow: 0 1px 2px rgb(16 24 40 / 6%), 0 1px 3px rgb(16 24 40 / 8%);
+  --font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1216;
+    --surface: #171b21;
+    --surface-2: #20262e;
+    --border: #2b323c;
+    --text: #e8ebf0;
+    --text-muted: #9aa4b2;
+    --accent: #6c9cff;
+    --high: #ff6b6b;
+    --high-bg: #3a1c1f;
+    --medium: #f0a54a;
+    --medium-bg: #3a2a16;
+    --low: #6fcf75;
+    --low-bg: #1a3020;
+    --fresh: #1b2740;
+    --shadow: none;
+  }
+}
