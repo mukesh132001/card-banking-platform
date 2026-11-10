@@ -74,7 +74,7 @@ class AccountControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].maskedNumber").value("•••• 1234"))
-                .andExpect(jsonPath("$[0].balance").value(5309.01))
+                .andExpect(jsonPath("$[0].balance").value("5309.01"))
                 .andExpect(jsonPath("$[0].type").value("CHECKING"));
     }
 
@@ -143,7 +143,7 @@ class AccountControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.page").value(2))
                 .andExpect(jsonPath("$.totalElements").value(11))
-                .andExpect(jsonPath("$.content[0].signedAmount").value(-12.50))
+                .andExpect(jsonPath("$.content[0].signedAmount").value("-12.50"))
                 .andExpect(jsonPath("$.content[0].merchant").value("Tesco"));
 
         verify(service).listTransactions(1L, 1L,

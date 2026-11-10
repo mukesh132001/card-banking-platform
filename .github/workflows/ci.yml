@@ -38,4 +38,46 @@ jobs:
       - name: Type-check and build
         run: npm run build
 
-  # The portal (Angular) job is added in milestone M2, once portal/package.json exists.
+  portal:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: portal
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: portal/package-lock.json
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Install
+        run: npm ci --no-audit --no-fund
+      - name: Unit tests (interceptor, guards, services, components)
+        run: npm run test:ci
+      - name: Production build (fails if bundle budgets are exceeded)
+        run: npm run build
+      - name: Start account-service for the end-to-end test
+        working-directory: services/account-service
+        run: |
+          mvn -B -q -DskipTests package
+          nohup java -jar target/account-service-*.jar > ../../account-service.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:8080/actuator/health > /dev/null && exit 0
+            sleep 2
+          done
+          cat ../../account-service.log
+          exit 1
+      - name: End-to-end test (Cypress, login -> transactions)
+        run: npm run e2e
+      - name: Upload Cypress screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-screenshots
+          path: portal/cypress/screenshots
+          if-no-files-found: ignore

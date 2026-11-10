@@ -10,6 +10,9 @@ node_modules/
 dist/
 .angular/
 coverage/
+portal/lighthouse-report.*
+portal/cypress/screenshots/
+portal/cypress/videos/
 
 # Terraform
 .terraform/
