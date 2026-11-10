@@ -48,6 +48,8 @@ and colour contrast within WCAG AA.
 
 ## Tests
 
+**69 unit tests, all passing, 90.7% line coverage** (`npm run test:ci`); CI also runs the Cypress journey on every pull request.
+
 - **Unit** (Jasmine + Karma): auth service (token storage, single-flight refresh, reload restore, roles, logout),
   interceptor (header rules, refresh before send, refresh-and-retry, logout on failed refresh), guards (roles,
   return-URL safety, login page), accounts service (query params, export paging, money as strings), money maths,
@@ -66,8 +68,8 @@ npm run lighthouse     # terminal 2: writes lighthouse-report.report.html / .jso
 
 | | Before (eager login, default change detection) | After (all routes lazy, `OnPush`) |
 | --- | --- | --- |
-| Performance (mobile) | _fill in_ | _fill in_ |
-| Initial JS (from `ng build`) | _fill in_ | _fill in_ |
+| Initial JS + CSS (`ng build`) | _to measure_ | **295.81 kB raw · 85.44 kB transferred** |
+| Lighthouse performance (mobile, /login) | _to measure_ | _to measure_ |
 
 To measure "before", check out the commit `portal: baseline before M2 polish` and run the same two commands.
 
